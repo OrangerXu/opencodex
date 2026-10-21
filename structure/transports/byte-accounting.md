@@ -148,6 +148,11 @@ cancellation or consumer closure; a buffer-limit failure terminates without anot
 `src/server/sse-payload-rewrite.ts` shares an incremental block buffer with native Chat. It scans
 only new input plus a three-character delimiter prefix and counts consumed blocks rather than
 remaining suffixes. CR, LF and CRLF share partial-event, injection/drop and EOF behavior.
+After an unsuccessful delimiter search, fragments without CR or LF cannot create a delimiter;
+the buffer advances its scan cursor without passing the growing carry to the regex again.
+Queued appends retain scan eligibility until drained. This adds no payload buffer or budget operation.
+Surrogate-boundary accounting caches the final code unit from each fragment rather than indexing
+the growing carry. A failed scan retains that boundary; emptying or clearing the buffer resets it.
 Output admission precedes its single UTF-8 encoding;
 failed enqueue and cancellation release the reservation without re-entering a disposed rewrite.
 Old/new buffer overlap remains charged against the same translator cap.
