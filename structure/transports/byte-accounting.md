@@ -121,6 +121,16 @@ lifecycle, cancellation races, protocol envelopes, and the real HTTP admission b
 
 ## Stream-buffer accounting
 
+The Chat adapter's decoded carry contains only an unfinished line after each drain.
+A network fragment with no newline retains the carry's already-counted UTF-8 size
+instead of splitting and re-encoding the entire growing line. The append and
+residual overlap reservations remain in their original order, including the
+otherwise redundant reservation, so existing cap failures and high-water accounting
+are unchanged. A fragment containing a newline drains through the existing parser.
+Unicode decoder boundaries, CRLF handling, EOF, terminal repairs and call ordering
+retain their contracts. `tests/adapters/openai/openai-chat-parallel-stream.test.ts`
+covers fragmented work scaling and the Unicode/EOF boundary cases.
+
 HTTP owners in `src/server/responses/core.ts`, `src/server/chat-completions.ts` and `src/server/claude-messages.ts` pass the request abort signal to `src/lib/translator-budget.ts`. An aborted request releases its owned translator budget even when its response body is never consumed. Abort finalization changes accounting only; the transport keeps ownership of producer cancellation and response terminal precedence. Explicit body cancellation also releases the budget before awaiting upstream reader cancellation. EOF and read errors share the same idempotent finalizer, which removes its abort listener. Responses lifetime wrapping in `src/server/responses/core-lifetime.ts` preserves native, eager-relay, preinspected-response, run-turn and nonreplayable markers, including through an outer serving-account lease. Both budget and account-lease finalization also carry replay-refusal provenance with `carryReplayRefusal`: deferred logging distinguishes synthetic transport-ambiguous refusals from genuine upstream 429 rate limits without changing the client response or replay policy. `tests/responses/responses-translated-reset.test.ts` covers attribution through each wrapper and their composition. `tests/adapters/translator-budget-lifetime.test.ts` holds cancellation pending and covers abort before wrapping, abort after wrapping, explicit cancellation, marker preservation and successful EOF.
 
 Disposed budgets ignore late call, reservation, charge and observation work; reservations created before disposal cannot resurrect per-turn or aggregate counters. The same Bun contract checks both accounting scopes before any producer cancellation and while an explicit cancellation is pending. Every producer must honor its transport abort link; disposed accounting does not provide a byte cap to work that outlives its request.
