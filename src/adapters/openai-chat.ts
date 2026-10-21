@@ -614,13 +614,9 @@ export function createOpenAIChatAdapter(provider: OcxProviderConfig): ProviderAd
           }
           bufferBytes = nextBufferBytes;
 
-          // The carry contains no newline after the previous drain. Without a new
-          // newline, keep its already-counted bytes instead of splitting and encoding
-          // the growing unfinished line again. TextDecoder emits complete code points.
-          const hasLineBreak = decoded.includes("\n");
-          const lines = hasLineBreak ? buffer.split("\n") : [];
-          if (hasLineBreak) buffer = lines.pop() ?? "";
-          const residualBytes = hasLineBreak ? budgetEncoder.encode(buffer).byteLength : bufferBytes;
+          const lines = decoded.includes("\n") ? buffer.split("\n") : [buffer];
+          buffer = lines.pop() ?? "";
+          const residualBytes = lines.length ? budgetEncoder.encode(buffer).byteLength : bufferBytes;
           const residualReservation = budget.reserveTransient(residualBytes, { kind: "live_transient" });
           residualReservation.commitRetained();
           budget.releaseRetained(bufferBytes, { kind: "live_transient" });
