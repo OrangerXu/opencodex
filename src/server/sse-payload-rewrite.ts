@@ -124,11 +124,11 @@ export function createSseBlockBuffer(
       try {
         compact();
         buffer += fragment;
+        lastCodeUnit = fragment.charCodeAt(fragment.length - 1);
+        needsScan ||= fragment.includes("\r") || fragment.includes("\n");
         reservation.commitRetained();
         budget.releaseRetained(bufferBytes, scope);
         bufferBytes = nextBytes;
-        lastCodeUnit = fragment.charCodeAt(fragment.length - 1);
-        needsScan ||= fragment.includes("\r") || fragment.includes("\n");
       } catch (error) {
         reservation.release();
         throw error;
