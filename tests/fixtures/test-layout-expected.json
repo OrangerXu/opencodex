@@ -3,6 +3,7 @@
     "bridge-terminal-refusal.test.ts": "adapters",
     "responses-replay-metadata-principal.test.ts": "responses",
     "responses-combo-replay-principal.test.ts": "responses",
+    "responses-translated-replay-principal.test.ts": "responses",
     "loop-terminal-refusal.test.ts": "images",
     "web-search-terminal-refusal.test.ts": "web-search",
     "combo-terminal-refusal.test.ts": "routing",

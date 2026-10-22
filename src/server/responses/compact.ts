@@ -1729,7 +1729,9 @@ export async function handleResponsesCompact(
     // The routed compaction turn is a handoff inside the same logical request, so it draws the
     // REMAINDER. Minting here is what let a native attempt spend three sends and the routed
     // fallback spend four more.
-    const response = await handleResponses(internalReq, config, logCtx, { abortSignal: req.signal, turnAdmissionLease, sendBudget, compactionRecoveryKind: "compaction-v1", compactionRoutingOverride: options.compactionRoutingOverride, ...(admission ? { admission } : {}) });
+    // internalReq keeps only FORWARD_HEADERS, so the caller principal is resolved from req.
+    const replayPrincipal = { clientPrincipalId: resolveContextPrincipal(req, config, admission) };
+    const response = await handleResponses(internalReq, config, logCtx, { abortSignal: req.signal, turnAdmissionLease, sendBudget, compactionRecoveryKind: "compaction-v1", compactionRoutingOverride: options.compactionRoutingOverride, replayPrincipal, ...(admission ? { admission } : {}) });
     if (req.signal.aborted) {
       void response.body?.cancel(req.signal.reason).catch(() => undefined);
       return formatErrorResponse(499, "client_cancelled", "Client cancelled compact request");

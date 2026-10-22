@@ -69,7 +69,7 @@ import {
   assertRouteAllowedByScope,
   resolveAdmissionModelScope,
 } from "./admission-model-scope";
-import type { DataPlaneAdmission } from "./auth-cors";
+import { resolveContextPrincipal, type DataPlaneAdmission } from "./auth-cors";
 import { tryClaimNativeMainProfileForTurn } from "../codex/native-main-admission";
 import {
   createTranslatorBudget,
@@ -499,6 +499,8 @@ async function handleChatCompletionsWithBudget(
     // #1686: the Chat surface translates its body and replays here, so the admission fact has
     // to ride along or a bearer-admitted Chat caller would still be refused by Direct.
     ...(logIds?.admission ? { admission: logIds.admission } : {}),
+    // The bridge request carries no caller credential, so resolve the replay principal here.
+    replayPrincipal: { clientPrincipalId: resolveContextPrincipal(req, config, logIds?.admission) },
     abortSignal: req.signal,
     // Body is Responses-shaped by now, but the client spoke Chat Completions.
     inboundWire: "chat",
