@@ -17,8 +17,9 @@ principal in addition to the conversation, route, credential, model, adapter, an
 Chat and Responses resolve that principal from data-plane admission before capture or replay; a
 bridge Combo carries the resolved principal, including its absence, through internal child options
 after stripping provisional caller Authorization. The Chat Completions bridge, Claude Messages, and
-the routed Responses compaction handoff likewise resolve it from the admitted client request before
-building their credential-free internal request. Client headers and bodies cannot assert this
+the routed Responses compaction handoff likewise resolve it from the admitted original request and
+hand it to `handleResponses` through its options, because the internal request they build may not
+carry the caller's opencodex key. Client headers and bodies cannot assert this
 identity. A keyless caller cannot retrieve another principal's plaintext reasoning. This rule describes
 the plaintext replay cache only. Process-local opaque serving and rejection memos also separate
 authenticated principals, with a distinct keyless namespace that preserves physical route-change

@@ -78,7 +78,7 @@ beforeEach(() => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     expect(url.hostname).toBe("first.example.test");
     const headers = new Headers(init?.headers);
-    expect(headers.get("authorization")).toBe("Bearer synthetic-provider-first");
+    expect(headers.get("authorization")).toBe(`Bearer ${config.providers.first!.apiKey}`);
     const body = JSON.parse(String(init?.body)) as Rec;
     outbound.push(body);
     return chatAnswer(body);
@@ -112,7 +112,7 @@ function headersFor(caller: Caller, thread: string, extra: Record<string, string
 }
 
 const OWNER_PRINCIPAL = resolveContextPrincipal(new Request("http://localhost/", {
-  headers: { authorization: "Bearer synthetic-caller-owner" },
+  headers: { authorization: `Bearer ${config.apiKeys!.find(entry => entry.id === "owner")!.key}` },
 }), config, LOOPBACK)!;
 
 /** The reasoning the provider received on the assistant tool-call message of the latest send. */
