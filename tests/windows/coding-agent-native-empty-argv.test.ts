@@ -98,7 +98,8 @@ describe.skipIf(process.platform !== "win32")("Windows coding-agent empty argv (
   });
 
   test("a turn with the dispatcher first on PATH launches the native executable and delivers both empty values", async () => {
-    const events = await runTurnWithPath([entryDir, binDir, process.env.PATH ?? ""].join(";"));
+    // Only the fixture directories: a Qoder CLI already installed on the host must not be found.
+    const events = await runTurnWithPath([entryDir, binDir].join(";"));
     expect(events.filter(event => event.type === "error")).toEqual([]);
     const argv = receivedArgv();
     expect(containsRun(argv, ["--tools", ""])).toBe(true);
@@ -106,7 +107,7 @@ describe.skipIf(process.platform !== "win32")("Windows coding-agent empty argv (
   });
 
   test("a dispatcher-only install is refused before anything is spawned", async () => {
-    const events = await runTurnWithPath([entryDir, process.env.PATH ?? ""].join(";"));
+    const events = await runTurnWithPath(entryDir);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ type: "error", code: "cli_dispatcher_drops_empty_args" });
     expect(existsSync(argvFile)).toBe(false);

@@ -314,7 +314,9 @@ export async function runCodingAgentTurn(input: CodingAgentTurnInput): Promise<v
       const natives = profile.binaryCandidates.map(candidate => `${candidate}.exe`).join(" or ");
       const cause = verdict.reason === "powershell_hop"
         ? "forwards arguments through PowerShell, which drops the empty values"
-        : "could not be read to confirm it keeps the empty values";
+        : verdict.reason === "indirect_launch"
+          ? "hands off to another launcher that could not be checked for the empty values"
+          : "could not be read completely to confirm it keeps the empty values";
       emit({
         type: "error",
         message: `${profile.label} CLI resolved to the batch dispatcher ${win32.basename(binary)}, which ${cause} this provider passes for tool and settings isolation. Put the CLI's native executable (${natives}) on PATH.`,

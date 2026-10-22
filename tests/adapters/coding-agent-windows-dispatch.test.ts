@@ -19,7 +19,11 @@ import { createTestTranslatorBudget } from "../helpers/translator-budget";
 // bin\qoderclicn\qoderclicn.exe on PATH. The dispatcher drops empty argv entries, so
 // --setting-sources "" swallowed --max-turns and every turn failed.
 const VENDOR_DISPATCHER = '@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0qodercn-dispatcher.ps1" -- %*\r\n';
-const NPM_CMD_SHIM = '@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n"%_prog%"  "%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n';
+const NPM_CMD_SHIM = [
+  "@ECHO off", "GOTO start", ":find_dp0", "SET dp0=%~dp0", "EXIT /b", ":start", "SETLOCAL", "CALL :find_dp0", "",
+  'IF EXIST "%dp0%\\node.exe" (', '  SET "_prog=%dp0%\\node.exe"', ") ELSE (", '  SET "_prog=node"', "  SET PATHEXT=%PATHEXT:;.JS;=;%", ")", "",
+  'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*',
+].join("\r\n");
 
 function windowsFs(files: readonly string[]) {
   const present = new Set(files.map(file => file.toLowerCase()));
@@ -117,6 +121,46 @@ describe("inspectBatchDispatcher", () => {
   });
 });
 
+describe("inspectBatchDispatcher with real files", () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "ocx-dispatcher-chain-")); });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  const write = (name: string, body: string) => { const path = join(dir, name); writeFileSync(path, body); return path; };
+
+  test("a PowerShell hop past the read bound is refused as incomplete", () => {
+    const padded = write("padded.cmd", "REM " + "x".repeat(64 * 1024) + "\r\npowershell.exe -File \"%~dp0d.ps1\" -- %*\r\n");
+    expect(inspectBatchDispatcher(padded)).toEqual({ preservesEmptyArguments: false, reason: "incomplete" });
+    const oversizedClean = write("big.cmd", "REM " + "x".repeat(64 * 1024) + "\r\n\"%~dp0real.exe\" %*\r\n");
+    expect(inspectBatchDispatcher(oversizedClean)).toEqual({ preservesEmptyArguments: false, reason: "incomplete" });
+    expect(inspectBatchDispatcher(write("small.cmd", NPM_CMD_SHIM))).toEqual({ preservesEmptyArguments: true });
+  });
+
+  test("a hop to another batch file is followed, and its PowerShell forward is found", () => {
+    write("inner.cmd", VENDOR_DISPATCHER);
+    expect(inspectBatchDispatcher(write("outer.cmd", '@call "%~dp0inner.cmd" %*\r\n'))).toEqual({ preservesEmptyArguments: false, reason: "powershell_hop" });
+    expect(inspectBatchDispatcher(write("direct.cmd", '@"%~dp0inner.cmd" %*\r\n'))).toEqual({ preservesEmptyArguments: false, reason: "powershell_hop" });
+  });
+
+  test("a verified chain that ends in a native image keeps the empty values", () => {
+    write("inner.cmd", '@"%~dp0real.exe" %*\r\n');
+    expect(inspectBatchDispatcher(write("outer.cmd", '@call "%~dp0inner.cmd" %*\r\n'))).toEqual({ preservesEmptyArguments: true });
+    expect(inspectBatchDispatcher(write("exe.cmd", '@call "%~dp0real.exe" %*\r\n'))).toEqual({ preservesEmptyArguments: true });
+  });
+
+  test("an unverifiable or missing hop is refused", () => {
+    expect(inspectBatchDispatcher(write("var.cmd", "@call %LAUNCHER% %*\r\n"))).toEqual({ preservesEmptyArguments: false, reason: "indirect_launch" });
+    expect(inspectBatchDispatcher(write("rel.cmd", '@call "inner.cmd" %*\r\n'))).toEqual({ preservesEmptyArguments: false, reason: "indirect_launch" });
+    expect(inspectBatchDispatcher(write("missing.cmd", '@call "%~dp0absent.cmd" %*\r\n'))).toEqual({ preservesEmptyArguments: false, reason: "unreadable" });
+  });
+
+  test("a self-reference is not re-read, and a chain deeper than the bound is refused", () => {
+    expect(inspectBatchDispatcher(write("self.cmd", '@if "%1"=="" "%~dp0self.cmd" --help\r\n@"%~dp0real.exe" %*\r\n'))).toEqual({ preservesEmptyArguments: true });
+    for (let index = 0; index < 5; index++) write("hop" + index + ".cmd", '@call "%~dp0hop' + (index + 1) + '.cmd" %*\r\n');
+    write("hop5.cmd", '@"%~dp0real.exe" %*\r\n');
+    expect(inspectBatchDispatcher(join(dir, "hop0.cmd"))).toEqual({ preservesEmptyArguments: false, reason: "indirect_launch" });
+  });
+});
+
 function resultChild(): ChildProcess {
   const child = new EventEmitter() as ChildProcess & { killed: boolean; exitCode: number | null };
   const stdout = new PassThrough();
@@ -200,4 +244,5 @@ describe("Windows turn preflight for empty isolation arguments", () => {
     expect(calls[0]!.args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
   });
 });
+
 
