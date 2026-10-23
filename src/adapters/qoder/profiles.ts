@@ -25,7 +25,11 @@ export const QODER_CN_PROFILE: QoderProfile = {
   region: "cn",
   label: "Qoder CN",
   canonicalBaseUrl: "https://qoder.cn",
-  binaryCandidates: ["qodercn", "qoderclicn"],
+  // The real executable first: the CN installer's `qodercn` is a .cmd
+  // dispatcher (entry\qodercn.cmd -> PowerShell), and empty-string arguments
+  // like `--setting-sources ""` do not survive that hop -- every turn died
+  // with `Invalid setting source: "--max-turns"` (#7518).
+  binaryCandidates: ["qoderclicn", "qodercn"],
   tokenEnv: "QODERCN_PERSONAL_ACCESS_TOKEN",
   installHint: "npm install -g @qodercn-ai/qoderclicn",
   documentationUrl: "https://docs.qoder.cn/en/cli/authentication",

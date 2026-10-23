@@ -56,16 +56,35 @@ export function clearCodingAgentBinaryCache(): void {
 export function whichFromPath(candidate: string): string | undefined {
   const pathVar = process.env.PATH ?? "";
   if (!pathVar) return undefined;
-  const extensions = process.platform === "win32" ? [".cmd", ".exe", ".bat", ""] : [""];
-  for (const dir of pathVar.split(delimiter)) {
-    if (!dir) continue;
-    for (const ext of extensions) {
-      const full = join(dir, `${candidate}${ext}`);
-      try {
-        if (existsSync(full)) return full;
-      } catch {
-        // An unreadable PATH entry must not abort discovery; skip it.
+  const dirs = pathVar.split(delimiter).filter(dir => dir !== "");
+  if (process.platform === "win32") {
+    // Real executables first, across the whole PATH: a `.cmd` dispatcher
+    // forwards through cmd.exe (and often PowerShell), and an empty-string
+    // argument does not survive that hop — the CLI then reads the *next*
+    // flag as the empty argument's value (`--setting-sources ""` became
+    // `--setting-sources --max-turns`, #7518). Only fall back to a shim
+    // when no `.exe` with this name exists anywhere on PATH.
+    const passes: string[][] = [[".exe"], [".cmd", ".bat", ""]];
+    for (const extensions of passes) {
+      for (const dir of dirs) {
+        for (const ext of extensions) {
+          const full = join(dir, `${candidate}${ext}`);
+          try {
+            if (existsSync(full)) return full;
+          } catch {
+            // An unreadable PATH entry must not abort discovery; skip it.
+          }
+        }
       }
+    }
+    return undefined;
+  }
+  for (const dir of dirs) {
+    const full = join(dir, candidate);
+    try {
+      if (existsSync(full)) return full;
+    } catch {
+      // An unreadable PATH entry must not abort discovery; skip it.
     }
   }
   return undefined;

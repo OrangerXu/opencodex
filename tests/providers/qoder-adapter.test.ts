@@ -526,7 +526,9 @@ describe("qoder adapter", () => {
   test("keeps Global and CN profiles, executables, destinations, and PAT variables isolated", async () => {
     expect(resolveQoderProfile("https://qoder.com/")).toBe(QODER_GLOBAL_PROFILE);
     expect(resolveQoderProfile("https://qoder.cn/")).toBe(QODER_CN_PROFILE);
-    expect(QODER_CN_PROFILE.binaryCandidates).toEqual(["qodercn", "qoderclicn"]);
+    // The real executable is tried before the .cmd dispatcher: empty-string
+    // arguments do not survive the dispatcher's cmd.exe/PowerShell hop (#7518).
+    expect(QODER_CN_PROFILE.binaryCandidates).toEqual(["qoderclicn", "qodercn"]);
 
     const globalEnv = buildQoderChildEnv(QODER_GLOBAL_PROFILE, "global-pat");
     const cnEnv = buildQoderChildEnv(QODER_CN_PROFILE, "cn-pat");
